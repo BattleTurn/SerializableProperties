@@ -1,0 +1,23 @@
+{
+  "name": "battleturn.serializable_properties",
+  "displayName": "Serializable Properties",
+  "version": "1.0.0",
+  "unity": "2022.1",
+  "description": "A set of serializable properties, such as 2D array",
+  "keywords": [
+    "Serializable",
+    "2D array"
+  ],
+  "category": "Scripting",
+  "dependencies": {
+  },
+  "repository": {
+    "url": "https://github.com/BattleTurn/SerializableProperties",
+    "type": "git"
+  },
+  "hidden": false,
+  "author": {
+    "name": "BattleTurn",
+    "url": "https://github.com/BattleTurn"
+  }
+}
