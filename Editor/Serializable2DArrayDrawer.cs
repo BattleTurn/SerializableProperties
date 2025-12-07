@@ -7,104 +7,114 @@ namespace SerializableProperties.Editor
     [CustomPropertyDrawer(typeof(Serializable2DArray<>), true)]
     public class Serializable2DArrayDrawer : PropertyDrawer
     {
-        private const int CELL_SIZE = 25;
+        private const int HEIGHT_SIZE = 20;
         private const int PADDING = 2;
         private const int HEADER_SIZE = 20;
-        private const float MAX_WIDTH = 600f;
+        private const int MIN_WIDTH_SIZE = 30;
+        private const int MAX_WIDTH_SIZE = 90;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             int rows = property.FindPropertyRelative("rows").intValue;
-            return EditorGUIUtility.singleLineHeight * 2 +        // label + row/col input
+            int cols = property.FindPropertyRelative("cols").intValue;
+
+            float viewWidth = EditorGUIUtility.currentViewWidth;
+            float cellSize = ComputeCellSize(viewWidth, cols);
+
+            return EditorGUIUtility.singleLineHeight * 2 +   // label + row/col input
                    HEADER_SIZE +
-                   (CELL_SIZE + PADDING) * rows +
-                   10;
+                   (HEADER_SIZE + PADDING) * rows +
+                   EditorGUIUtility.standardVerticalSpacing + 6f;;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            SerializedProperty rowsProp = property.FindPropertyRelative("rows");
-            SerializedProperty colsProp = property.FindPropertyRelative("cols");
-            SerializedProperty serializedValues = property.FindPropertyRelative("serializedValues");
+            var rowsProp = property.FindPropertyRelative("rows");
+            var colsProp = property.FindPropertyRelative("cols");
+            var serializedValues = property.FindPropertyRelative("serializedValues");
 
-            // Draw label
-            EditorGUI.LabelField(new Rect(position.x, position.y, MAX_WIDTH, EditorGUIUtility.singleLineHeight), label);
+            // Label
+            EditorGUI.LabelField(
+                new Rect(position.x, position.y, position.width, EditorGUIUtility.singleLineHeight),
+                label
+            );
 
-            float cursorY = position.y + EditorGUIUtility.singleLineHeight + 2;
+            float cursorY = position.y + EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-            // --------------------------
-            // Rows & Cols input fields
-            // --------------------------
-            float half = (position.width - 20) * 0.5f;
-
-            Rect rowRect = new Rect(position.x, cursorY, half, EditorGUIUtility.singleLineHeight);
-            Rect colRect = new Rect(position.x + half + 10, cursorY, half, EditorGUIUtility.singleLineHeight);
+            // Rows & Cols
+            float half = (position.width - 20f) * 0.5f;
+            var rowRect = new Rect(position.x, cursorY, half, EditorGUIUtility.singleLineHeight);
+            var colRect = new Rect(position.x + half + 10f, cursorY, half, EditorGUIUtility.singleLineHeight);
 
             EditorGUI.BeginChangeCheck();
-
             int newRows = EditorGUI.IntField(rowRect, "Rows", rowsProp.intValue);
             int newCols = EditorGUI.IntField(colRect, "Cols", colsProp.intValue);
-
             if (EditorGUI.EndChangeCheck())
             {
                 rowsProp.intValue = Mathf.Max(1, newRows);
                 colsProp.intValue = Mathf.Max(1, newCols);
-
-                // Apply field changes BEFORE resizing
                 property.serializedObject.ApplyModifiedProperties();
 
-                // Get actual 2d array instance
-                object target = fieldInfo.GetValue(property.serializedObject.targetObject);
-
-                if (target != null)
+                object owner = property.serializedObject.targetObject;
+                if (owner != null)
                 {
-                    var array = (dynamic)target;
-                    array.SetSize(rowsProp.intValue, colsProp.intValue);
+                    // fieldInfo ở đây là field chứa Serializable2DArray<>, nên GetValue trả đúng instance
+                    var arrayInstance = fieldInfo.GetValue(owner);
+                    if (arrayInstance != null)
+                    {
+                        dynamic dyn = arrayInstance;
+                        dyn.SetSize(rowsProp.intValue, colsProp.intValue);
+                    }
                 }
-
                 property.serializedObject.Update();
             }
 
-            cursorY += EditorGUIUtility.singleLineHeight + 4;
+            cursorY += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-            // ====================
-            // Draw Column Headers
-            // ====================
+            float width = ComputeCellSize(position.width, colsProp.intValue);
+
+            // Headers
             float startX = position.x + HEADER_SIZE;
             float startY = cursorY;
-
             for (int col = 0; col < colsProp.intValue; col++)
             {
-                float x = startX + col * (CELL_SIZE + PADDING);
-                Rect headerRect = new Rect(x, startY, CELL_SIZE, HEADER_SIZE);
+                float x = startX + col * (width + PADDING);
+                var headerRect = new Rect(x, startY, width, HEADER_SIZE);
                 EditorGUI.LabelField(headerRect, col.ToString(), EditorStyles.centeredGreyMiniLabel);
             }
 
             cursorY += HEADER_SIZE;
 
-            // ===== Draw Cells =====
-
+            // Cells
             int index = 0;
-
             for (int row = 0; row < rowsProp.intValue; row++)
             {
-                float y = cursorY + row * (CELL_SIZE + PADDING);
+                float y = cursorY + row * (HEADER_SIZE + PADDING);
+                float headerY = y - EditorGUIUtility.singleLineHeight * 2 + EditorGUIUtility.standardVerticalSpacing;
 
-                // Draw row header
-                Rect rowHeader = new Rect(position.x, y, HEADER_SIZE, CELL_SIZE);
+                // Row header
+                var rowHeader = new Rect(position.x, headerY, HEADER_SIZE, width);
                 EditorGUI.LabelField(rowHeader, row.ToString(), EditorStyles.centeredGreyMiniLabel);
 
                 for (int col = 0; col < colsProp.intValue; col++)
                 {
-                    float x = startX + col * (CELL_SIZE + PADDING);
-                    Rect cellRect = new Rect(x, y, CELL_SIZE, CELL_SIZE);
+                    float x = startX + col * (width + PADDING);
+                    var cellRect = new Rect(x, y, width, HEADER_SIZE);
 
-                    SerializedProperty cell = serializedValues.GetArrayElementAtIndex(index);
+                    var cell = serializedValues.GetArrayElementAtIndex(index);
                     EditorGUI.PropertyField(cellRect, cell, GUIContent.none);
 
                     index++;
                 }
             }
+        }
+
+        private static float ComputeCellSize(float totalWidth, int cols)
+        {
+            if (cols <= 0) cols = 1;
+            float available = Mathf.Max(0f, totalWidth - HEADER_SIZE - 8f);
+            float cell = (available - (cols - 1) * PADDING) / cols;
+            return Mathf.Clamp(cell, MIN_WIDTH_SIZE, MAX_WIDTH_SIZE);
         }
     }
 }
