@@ -11,19 +11,16 @@ namespace SerializableProperties.Editor
         private const int PADDING = 2;
         private const int HEADER_SIZE = 20;
         private const int MIN_WIDTH_SIZE = 30;
-        private const int MAX_WIDTH_SIZE = 90;
+        private const int MAX_WIDTH_SIZE = 120;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             int rows = property.FindPropertyRelative("rows").intValue;
             int cols = property.FindPropertyRelative("cols").intValue;
 
-            float viewWidth = EditorGUIUtility.currentViewWidth;
-            float cellSize = ComputeCellSize(viewWidth, cols);
-
             return EditorGUIUtility.singleLineHeight * 2 +   // label + row/col input
                    HEADER_SIZE +
-                   (HEADER_SIZE + PADDING) * rows +
+                   (HEIGHT_SIZE + PADDING) * rows +
                    EditorGUIUtility.standardVerticalSpacing + 6f;;
         }
 
@@ -89,17 +86,15 @@ namespace SerializableProperties.Editor
             int index = 0;
             for (int row = 0; row < rowsProp.intValue; row++)
             {
-                float y = cursorY + row * (HEADER_SIZE + PADDING);
-                float headerY = y - EditorGUIUtility.singleLineHeight * 2 + EditorGUIUtility.standardVerticalSpacing;
-
+                float y = cursorY + row * (HEIGHT_SIZE + PADDING);
                 // Row header
-                var rowHeader = new Rect(position.x, headerY, HEADER_SIZE, width);
+                var rowHeader = new Rect(position.x, y, HEADER_SIZE, HEIGHT_SIZE);
                 EditorGUI.LabelField(rowHeader, row.ToString(), EditorStyles.centeredGreyMiniLabel);
 
                 for (int col = 0; col < colsProp.intValue; col++)
                 {
                     float x = startX + col * (width + PADDING);
-                    var cellRect = new Rect(x, y, width, HEADER_SIZE);
+                    var cellRect = new Rect(x, y, width, HEIGHT_SIZE);
 
                     var cell = serializedValues.GetArrayElementAtIndex(index);
                     EditorGUI.PropertyField(cellRect, cell, GUIContent.none);
