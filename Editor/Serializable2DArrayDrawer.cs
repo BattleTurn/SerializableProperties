@@ -15,19 +15,18 @@ namespace SerializableProperties.Editor
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            int rows = property.FindPropertyRelative("rows").intValue;
-            int cols = property.FindPropertyRelative("cols").intValue;
+            int y = property.FindPropertyRelative("y").intValue;
 
             return EditorGUIUtility.singleLineHeight * 2 +   // label + row/col input
                    HEADER_SIZE +
-                   (HEIGHT_SIZE + PADDING) * rows +
-                   EditorGUIUtility.standardVerticalSpacing + 6f;;
+                   (HEIGHT_SIZE + PADDING) * y +
+                   EditorGUIUtility.standardVerticalSpacing + 6f; ;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
-            var rowsProp = property.FindPropertyRelative("rows");
-            var colsProp = property.FindPropertyRelative("cols");
+            var yProp = property.FindPropertyRelative("y");
+            var xProp = property.FindPropertyRelative("x");
             var serializedValues = property.FindPropertyRelative("serializedValues");
 
             // Label
@@ -40,16 +39,16 @@ namespace SerializableProperties.Editor
 
             // Rows & Cols
             float half = (position.width - 20f) * 0.5f;
-            var rowRect = new Rect(position.x, cursorY, half, EditorGUIUtility.singleLineHeight);
-            var colRect = new Rect(position.x + half + 10f, cursorY, half, EditorGUIUtility.singleLineHeight);
+            var yRect = new Rect(position.x + half + 10f, cursorY, half, EditorGUIUtility.singleLineHeight);
+            var xRect = new Rect(position.x, cursorY, half, EditorGUIUtility.singleLineHeight);
 
             EditorGUI.BeginChangeCheck();
-            int newRows = EditorGUI.IntField(rowRect, "Rows", rowsProp.intValue);
-            int newCols = EditorGUI.IntField(colRect, "Cols", colsProp.intValue);
+            int newX = EditorGUI.IntField(xRect, "X", xProp.intValue);
+            int newY = EditorGUI.IntField(yRect, "Y", yProp.intValue);
             if (EditorGUI.EndChangeCheck())
             {
-                rowsProp.intValue = Mathf.Max(1, newRows);
-                colsProp.intValue = Mathf.Max(1, newCols);
+                yProp.intValue = Mathf.Max(1, newY);
+                xProp.intValue = Mathf.Max(1, newX);
                 property.serializedObject.ApplyModifiedProperties();
 
                 object owner = property.serializedObject.targetObject;
@@ -60,7 +59,7 @@ namespace SerializableProperties.Editor
                     if (arrayInstance != null)
                     {
                         dynamic dyn = arrayInstance;
-                        dyn.SetSize(rowsProp.intValue, colsProp.intValue);
+                        dyn.SetSize(xProp.intValue, yProp.intValue);
                     }
                 }
                 property.serializedObject.Update();
@@ -68,12 +67,12 @@ namespace SerializableProperties.Editor
 
             cursorY += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
-            float width = ComputeCellSize(position.width, colsProp.intValue);
+            float width = ComputeCellSize(position.width, xProp.intValue);
 
             // Headers
             float startX = position.x + HEADER_SIZE;
             float startY = cursorY;
-            for (int col = 0; col < colsProp.intValue; col++)
+            for (int col = 0; col < xProp.intValue; col++)
             {
                 float x = startX + col * (width + PADDING);
                 var headerRect = new Rect(x, startY, width, HEADER_SIZE);
@@ -84,14 +83,14 @@ namespace SerializableProperties.Editor
 
             // Cells
             int index = 0;
-            for (int row = 0; row < rowsProp.intValue; row++)
+            for (int row = 0; row < yProp.intValue; row++)
             {
                 float y = cursorY + row * (HEIGHT_SIZE + PADDING);
                 // Row header
                 var rowHeader = new Rect(position.x, y, HEADER_SIZE, HEIGHT_SIZE);
                 EditorGUI.LabelField(rowHeader, row.ToString(), EditorStyles.centeredGreyMiniLabel);
 
-                for (int col = 0; col < colsProp.intValue; col++)
+                for (int col = 0; col < xProp.intValue; col++)
                 {
                     float x = startX + col * (width + PADDING);
                     var cellRect = new Rect(x, y, width, HEIGHT_SIZE);
