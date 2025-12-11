@@ -74,6 +74,17 @@ namespace BattleTurn.Serializable.Runtime
                     index++;
                 }
         }
+
+        public T[,] ToArray()
+        {
+            return array2D;
+        }
+
+        public int GetLength(int dimension)
+        {
+            return array2D.GetLength(dimension);
+        }
     }
+
 
 }
