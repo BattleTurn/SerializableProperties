@@ -12,15 +12,16 @@ namespace SerializableProperties.Editor
         private const int HEADER_SIZE = 20;
         private const int MIN_WIDTH_SIZE = 30;
         private const int MAX_WIDTH_SIZE = 120;
+        private Vector2 _scroll = Vector2.zero;
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
             int y = property.FindPropertyRelative("y").intValue;
 
-             return EditorGUIUtility.singleLineHeight * 3 +   // label + row/col input + row order
-                   HEADER_SIZE +
-                   (HEIGHT_SIZE + PADDING) * y +
-                 EditorGUIUtility.standardVerticalSpacing + 6f;
+            int visibleRows = Mathf.Min(y, 5);
+            return EditorGUIUtility.singleLineHeight * 3 +   // label + row/col input + row order
+                (HEADER_SIZE + (HEIGHT_SIZE + PADDING) * visibleRows) +
+                EditorGUIUtility.standardVerticalSpacing + 6f;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
@@ -71,8 +72,8 @@ namespace SerializableProperties.Editor
             // Row order dropdown
             var orderRect = new Rect(position.x, cursorY, position.width, EditorGUIUtility.singleLineHeight);
             EditorGUI.BeginChangeCheck();
-            var newOrder = (BattleTurn.Serializable.Runtime.RowOrder)
-                EditorGUI.EnumPopup(orderRect, "Row Order", (BattleTurn.Serializable.Runtime.RowOrder)orderProp.enumValueIndex);
+            var newOrder = (RowOrder)
+                EditorGUI.EnumPopup(orderRect, "Row Order", (RowOrder)orderProp.enumValueIndex);
             if (EditorGUI.EndChangeCheck())
             {
                 orderProp.enumValueIndex = (int)newOrder;
@@ -84,9 +85,21 @@ namespace SerializableProperties.Editor
 
             float width = ComputeCellSize(position.width, xProp.intValue);
 
-            // Headers
-            float startX = position.x + HEADER_SIZE;
-            float startY = cursorY;
+            // Scrollable grid area
+            int visibleRows = Mathf.Min(yProp.intValue, 5);
+            float viewportHeight = HEADER_SIZE + (HEIGHT_SIZE + PADDING) * visibleRows;
+            var scrollRect = new Rect(position.x, cursorY, position.width, viewportHeight);
+
+            float contentWidth = HEADER_SIZE + xProp.intValue * (width + PADDING);
+            float contentHeight = HEADER_SIZE + yProp.intValue * (HEIGHT_SIZE + PADDING);
+            bool showH = contentWidth > scrollRect.width;
+            bool showV = yProp.intValue > visibleRows;
+
+            _scroll = GUI.BeginScrollView(scrollRect, _scroll, new Rect(0, 0, contentWidth, contentHeight), showH, showV);
+
+            // Headers inside scroll view (local origin)
+            float startX = HEADER_SIZE;
+            float startY = 0f;
             for (int col = 0; col < xProp.intValue; col++)
             {
                 float x = startX + col * (width + PADDING);
@@ -94,24 +107,22 @@ namespace SerializableProperties.Editor
                 EditorGUI.LabelField(headerRect, col.ToString(), EditorStyles.centeredGreyMiniLabel);
             }
 
-            cursorY += HEADER_SIZE;
-
-            // Cells
+            // Cells inside scroll view
             for (int row = 0; row < yProp.intValue; row++)
             {
-                float y = cursorY + row * (HEIGHT_SIZE + PADDING);
+                float yCell = HEADER_SIZE + row * (HEIGHT_SIZE + PADDING);
                 // Row header (display label depends on order)
                 int displayRow = ((BattleTurn.Serializable.Runtime.RowOrder)orderProp.enumValueIndex) == BattleTurn.Serializable.Runtime.RowOrder.TopToBottom
                     ? row
                     : (yProp.intValue - 1 - row);
                 int storageRow = displayRow; // storage indexing uses row index directly
-                var rowHeader = new Rect(position.x, y, HEADER_SIZE, HEIGHT_SIZE);
+                var rowHeader = new Rect(0f, yCell, HEADER_SIZE, HEIGHT_SIZE);
                 EditorGUI.LabelField(rowHeader, displayRow.ToString(), EditorStyles.centeredGreyMiniLabel);
 
                 for (int col = 0; col < xProp.intValue; col++)
                 {
                     float x = startX + col * (width + PADDING);
-                    var cellRect = new Rect(x, y, width, HEIGHT_SIZE);
+                    var cellRect = new Rect(x, yCell, width, HEIGHT_SIZE);
 
                     // Flat index matches runtime serialization: r (col) outer, c (row) inner → r*y + c
                     int flat = col * yProp.intValue + storageRow;
@@ -119,6 +130,8 @@ namespace SerializableProperties.Editor
                     EditorGUI.PropertyField(cellRect, cell, GUIContent.none);
                 }
             }
+
+            GUI.EndScrollView();
         }
 
         private static float ComputeCellSize(float totalWidth, int cols)
