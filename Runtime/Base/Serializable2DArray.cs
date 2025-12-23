@@ -106,6 +106,66 @@ namespace BattleTurn.Serializable.Runtime
         {
             return array2D.GetLength(dimension);
         }
+
+        // Immediately set the slot to default(T) without destroying anything.
+        public void RemoveAt(int px, int py)
+        {
+            array2D[px, py] = default;
+        }
+
+        // Immediately clear the slot, then schedule the Unity object for destruction at end-of-frame (safe in runtime).
+        public void RemoveAndDestroyAt(int px, int py)
+        {
+            if (array2D[px, py] is UnityEngine.Object u && u != null)
+            {
+                array2D[px, py] = default;
+                UnityEngine.Object.Destroy(u);
+            }
+            else
+            {
+                // Non-Unity types or already-null → just clear
+                array2D[px, py] = default;
+            }
+        }
+
+        // Editor-only or special cases: force immediate destruction (use cautiously in play mode).
+        public void RemoveAndDestroyImmediateAt(int px, int py)
+        {
+            if (array2D[px, py] is UnityEngine.Object u && u != null)
+            {
+                array2D[px, py] = default;
+                UnityEngine.Object.DestroyImmediate(u);
+            }
+            else
+            {
+                array2D[px, py] = default;
+            }
+        }
+
+        // True if the slot holds a UnityEngine.Object that is effectively null (destroyed or not assigned)
+        public bool IsUnityNullAt(int px, int py)
+        {
+            var v = array2D[px, py] as UnityEngine.Object;
+            return v == null;
+        }
+
+        // Sweep grid and clear any entries that are Unity-destroyed (fake-null). Returns number of cleared cells.
+        public int PruneDestroyed()
+        {
+            int removed = 0;
+            for (int ix = 0; ix < x; ix++)
+            {
+                for (int iy = 0; iy < y; iy++)
+                {
+                    if (array2D[ix, iy] is UnityEngine.Object u && u == null)
+                    {
+                        array2D[ix, iy] = default;
+                        removed++;
+                    }
+                }
+            }
+            return removed;
+        }
     }
 
 
