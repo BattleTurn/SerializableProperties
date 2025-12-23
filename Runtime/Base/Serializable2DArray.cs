@@ -4,6 +4,12 @@ using UnityEngine;
 
 namespace BattleTurn.Serializable.Runtime
 {
+    public enum RowOrder
+    {
+        TopToBottom = 0,
+        BottomToTop = 1
+    }
+
     [Serializable]
     public class Serializable2DArray<T> : ISerializationCallbackReceiver
     {
@@ -12,10 +18,13 @@ namespace BattleTurn.Serializable.Runtime
 
         [SerializeField] private List<T> serializedValues = new();
 
+        [SerializeField] private RowOrder rowOrder = RowOrder.TopToBottom;
+
         [NonSerialized] private T[,] array2D;
 
         public int Y => y;
         public int X => x;
+        public RowOrder RowOrder => rowOrder;
 
         public Serializable2DArray()
         {

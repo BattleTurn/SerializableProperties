@@ -17,16 +17,17 @@ namespace SerializableProperties.Editor
         {
             int y = property.FindPropertyRelative("y").intValue;
 
-            return EditorGUIUtility.singleLineHeight * 2 +   // label + row/col input
+             return EditorGUIUtility.singleLineHeight * 3 +   // label + row/col input + row order
                    HEADER_SIZE +
                    (HEIGHT_SIZE + PADDING) * y +
-                   EditorGUIUtility.standardVerticalSpacing + 6f; ;
+                 EditorGUIUtility.standardVerticalSpacing + 6f;
         }
 
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
         {
             var yProp = property.FindPropertyRelative("y");
             var xProp = property.FindPropertyRelative("x");
+            var orderProp = property.FindPropertyRelative("rowOrder");
             var serializedValues = property.FindPropertyRelative("serializedValues");
 
             // Label
@@ -67,6 +68,20 @@ namespace SerializableProperties.Editor
 
             cursorY += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
+            // Row order dropdown
+            var orderRect = new Rect(position.x, cursorY, position.width, EditorGUIUtility.singleLineHeight);
+            EditorGUI.BeginChangeCheck();
+            var newOrder = (BattleTurn.Serializable.Runtime.RowOrder)
+                EditorGUI.EnumPopup(orderRect, "Row Order", (BattleTurn.Serializable.Runtime.RowOrder)orderProp.enumValueIndex);
+            if (EditorGUI.EndChangeCheck())
+            {
+                orderProp.enumValueIndex = (int)newOrder;
+                property.serializedObject.ApplyModifiedProperties();
+                property.serializedObject.Update();
+            }
+
+            cursorY += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
+
             float width = ComputeCellSize(position.width, xProp.intValue);
 
             // Headers
@@ -82,23 +97,26 @@ namespace SerializableProperties.Editor
             cursorY += HEADER_SIZE;
 
             // Cells
-            int index = 0;
             for (int row = 0; row < yProp.intValue; row++)
             {
                 float y = cursorY + row * (HEIGHT_SIZE + PADDING);
-                // Row header
+                // Row header (display label depends on order)
+                int displayRow = ((BattleTurn.Serializable.Runtime.RowOrder)orderProp.enumValueIndex) == BattleTurn.Serializable.Runtime.RowOrder.TopToBottom
+                    ? row
+                    : (yProp.intValue - 1 - row);
+                int storageRow = displayRow; // storage indexing uses row index directly
                 var rowHeader = new Rect(position.x, y, HEADER_SIZE, HEIGHT_SIZE);
-                EditorGUI.LabelField(rowHeader, row.ToString(), EditorStyles.centeredGreyMiniLabel);
+                EditorGUI.LabelField(rowHeader, displayRow.ToString(), EditorStyles.centeredGreyMiniLabel);
 
                 for (int col = 0; col < xProp.intValue; col++)
                 {
                     float x = startX + col * (width + PADDING);
                     var cellRect = new Rect(x, y, width, HEIGHT_SIZE);
 
-                    var cell = serializedValues.GetArrayElementAtIndex(index);
+                    // Flat index matches runtime serialization: r (col) outer, c (row) inner → r*y + c
+                    int flat = col * yProp.intValue + storageRow;
+                    var cell = serializedValues.GetArrayElementAtIndex(flat);
                     EditorGUI.PropertyField(cellRect, cell, GUIContent.none);
-
-                    index++;
                 }
             }
         }
