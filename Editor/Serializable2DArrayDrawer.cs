@@ -85,44 +85,78 @@ namespace SerializableProperties.Editor
 
             float width = ComputeCellSize(position.width, xProp.intValue);
 
-            // Scrollable grid area
+            // Scrollable grid area with sticky column headers
             int visibleRows = Mathf.Min(yProp.intValue, 5);
             float viewportHeight = HEADER_SIZE + (HEIGHT_SIZE + PADDING) * visibleRows;
-            var scrollRect = new Rect(position.x, cursorY, position.width, viewportHeight);
 
-            float contentWidth = HEADER_SIZE + xProp.intValue * (width + PADDING);
-            float contentHeight = HEADER_SIZE + yProp.intValue * (HEIGHT_SIZE + PADDING);
-            bool showH = contentWidth > scrollRect.width;
-            bool showV = yProp.intValue > visibleRows;
+            // Sticky header strips (top for columns, left for rows)
+            var headerStripRect = new Rect(position.x + HEADER_SIZE, cursorY, position.width - HEADER_SIZE, HEADER_SIZE);
+            var rowHeaderStripRect = new Rect(position.x, cursorY + HEADER_SIZE, HEADER_SIZE, viewportHeight - HEADER_SIZE);
 
-            _scroll = GUI.BeginScrollView(scrollRect, _scroll, new Rect(0, 0, contentWidth, contentHeight), showH, showV);
+            // Scroll view below header strip and right of row headers
+            var scrollRect = new Rect(position.x + HEADER_SIZE, cursorY + HEADER_SIZE, position.width - HEADER_SIZE, viewportHeight - HEADER_SIZE);
 
-            // Headers inside scroll view (local origin)
-            float startX = HEADER_SIZE;
-            float startY = 0f;
-            for (int col = 0; col < xProp.intValue; col++)
+            float contentWidth = xProp.intValue * (width + PADDING);
+            float contentHeight = yProp.intValue * (HEIGHT_SIZE + PADDING);
+
+            // Ensure backing serialized list has enough elements to index into (x * y)
+            int required = Mathf.Max(0, xProp.intValue * yProp.intValue);
+            if (serializedValues.arraySize != required)
             {
-                float x = startX + col * (width + PADDING);
-                var headerRect = new Rect(x, startY, width, HEADER_SIZE);
-                EditorGUI.LabelField(headerRect, col.ToString(), EditorStyles.centeredGreyMiniLabel);
+                serializedValues.arraySize = required;
+                property.serializedObject.ApplyModifiedProperties();
+                property.serializedObject.Update();
             }
 
+            // Draw sticky column headers (aligned with horizontal scroll)
+            GUI.BeginGroup(headerStripRect);
+            {
+                float headerStartX = 0f; // inside header group, columns begin at 0
+                float xOffset = -_scroll.x; // follow horizontal scroll
+                for (int col = 0; col < xProp.intValue; col++)
+                {
+                    float x = xOffset + headerStartX + col * (width + PADDING);
+                    var hdr = new Rect(x, 0f, width, HEADER_SIZE);
+                    if (hdr.xMax >= 0 && hdr.x <= headerStripRect.width)
+                        EditorGUI.LabelField(hdr, col.ToString(), EditorStyles.centeredGreyMiniLabel);
+                }
+            }
+            GUI.EndGroup();
+
+            // Sticky row headers (aligned with vertical scroll)
+            GUI.BeginGroup(rowHeaderStripRect);
+            {
+                float yOffset = -_scroll.y;
+                for (int row = 0; row < yProp.intValue; row++)
+                {
+                    float yPos = yOffset + row * (HEIGHT_SIZE + PADDING);
+                    if (yPos + HEIGHT_SIZE < 0 || yPos > rowHeaderStripRect.height) continue;
+                    int displayRow = ((BattleTurn.Serializable.Runtime.RowOrder)orderProp.enumValueIndex) == BattleTurn.Serializable.Runtime.RowOrder.TopToBottom
+                        ? row
+                        : (yProp.intValue - 1 - row);
+                    var rHdr = new Rect(0f, yPos, HEADER_SIZE, HEIGHT_SIZE);
+                    EditorGUI.LabelField(rHdr, displayRow.ToString(), EditorStyles.centeredGreyMiniLabel);
+                }
+            }
+            GUI.EndGroup();
+
+            _scroll = GUI.BeginScrollView(scrollRect, _scroll, new Rect(0, 0, contentWidth, contentHeight));
+
             // Cells inside scroll view
+            float cellStartX = 0f;
             for (int row = 0; row < yProp.intValue; row++)
             {
-                float yCell = HEADER_SIZE + row * (HEIGHT_SIZE + PADDING);
+                float yCell = row * (HEIGHT_SIZE + PADDING);
                 // Row header (display label depends on order)
                 int displayRow = ((BattleTurn.Serializable.Runtime.RowOrder)orderProp.enumValueIndex) == BattleTurn.Serializable.Runtime.RowOrder.TopToBottom
                     ? row
                     : (yProp.intValue - 1 - row);
                 int storageRow = displayRow; // storage indexing uses row index directly
-                var rowHeader = new Rect(0f, yCell, HEADER_SIZE, HEIGHT_SIZE);
-                EditorGUI.LabelField(rowHeader, displayRow.ToString(), EditorStyles.centeredGreyMiniLabel);
 
                 for (int col = 0; col < xProp.intValue; col++)
                 {
-                    float x = startX + col * (width + PADDING);
-                    var cellRect = new Rect(x, yCell, width, HEIGHT_SIZE);
+                    float xPos = cellStartX + col * (width + PADDING);
+                    var cellRect = new Rect(xPos, yCell, width, HEIGHT_SIZE);
 
                     // Flat index matches runtime serialization: r (col) outer, c (row) inner → r*y + c
                     int flat = col * yProp.intValue + storageRow;
