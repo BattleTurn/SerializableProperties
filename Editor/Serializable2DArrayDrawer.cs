@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEditor;
 using BattleTurn.Serializable.Runtime;
 
-namespace SerializableProperties.Editor
+namespace BattleTurn.Serializable.Editor
 {
     [CustomPropertyDrawer(typeof(Serializable2DArray<>), true)]
     public class Serializable2DArrayDrawer : PropertyDrawer
