@@ -108,10 +108,17 @@ namespace BattleTurn.Serializable.Editor
                 else
                 {
                     Type t = types[newIndex - 1];
-                    if (!typeof(UnityEngine.Object).IsAssignableFrom(t))
+
+                    if (typeof(UnityEngine.Object).IsAssignableFrom(t))
                     {
-                        managed.managedReferenceValue = Activator.CreateInstance(t);
+                        // 👉 CHỖ FIX: chuyển sang MonoBehaviour / ScriptableObject
+                        managed.managedReferenceValue = null;
+                    }
+                    else
+                    {
+                        // 👉 Pure C# class
                         unityObj.objectReferenceValue = null;
+                        managed.managedReferenceValue = Activator.CreateInstance(t);
                     }
                 }
             }
@@ -149,38 +156,40 @@ namespace BattleTurn.Serializable.Editor
 
         int GetPopupIndex(SerializedProperty property)
         {
-            string key = property.propertyPath;
-
-            if (popupIndexCache.TryGetValue(key, out int i))
-                return i;
-            // Ensure initialization when height is queried before OnGUI
-            try
+            if (!inited)
             {
-                var fieldType = fieldInfo?.FieldType;
-                if (fieldType != null && fieldType.IsGenericType)
+                var fieldType = fieldInfo.FieldType;
+                if (fieldType.IsGenericType)
                 {
                     var iface = fieldType.GetGenericArguments()[0];
                     Init(iface);
                 }
             }
-            catch { }
+
+            if (types == null)
+                return 0;
+
+            string key = property.propertyPath;
+
+            if (popupIndexCache.TryGetValue(key, out int cached))
+                return cached;
 
             var unityObj = property.FindPropertyRelative("unityObject");
             var managed = property.FindPropertyRelative("managed");
 
             if (managed != null && managed.managedReferenceValue != null)
             {
-                int idx = Array.IndexOf(types ?? Array.Empty<Type>(), managed.managedReferenceValue.GetType());
+                int idx = Array.IndexOf(types, managed.managedReferenceValue.GetType());
                 return popupIndexCache[key] = idx >= 0 ? idx + 1 : 0;
             }
 
             if (unityObj != null && unityObj.objectReferenceValue != null)
             {
-                int idx = Array.IndexOf(types ?? Array.Empty<Type>(), unityObj.objectReferenceValue.GetType());
+                int idx = Array.IndexOf(types, unityObj.objectReferenceValue.GetType());
                 return popupIndexCache[key] = idx >= 0 ? idx + 1 : 0;
             }
 
-            return 0;
+            return popupIndexCache[key] = 0;
         }
 
         void DrawManaged(Rect pos, float y, SerializedProperty managed)

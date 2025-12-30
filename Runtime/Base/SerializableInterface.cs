@@ -7,38 +7,17 @@ namespace BattleTurn.Serializable.Runtime
     public class SerializableInterface<T> where T : class
     {
         [SerializeField] private UnityEngine.Object unityObject;
+
         [SerializeReference] private T managed;
 
         public T Value
         {
             get
             {
-                if (managed != null)
-                    return managed;
-
-                return unityObject as T;
+                if (unityObject is T t)
+                    return t;
+                return managed;
             }
-        }
-
-        public UnityEngine.Object UnityObject => unityObject;
-        public T Managed => managed;
-
-        public void SetUnityObject(UnityEngine.Object obj)
-        {
-            unityObject = obj;
-            managed = null;
-        }
-
-        public void SetManaged(T value)
-        {
-            managed = value;
-            unityObject = null;
-        }
-
-        public void Clear()
-        {
-            unityObject = null;
-            managed = null;
         }
     }
 }
