@@ -10,7 +10,6 @@ namespace BattleTurn.Serializable.Editor
     [CustomPropertyDrawer(typeof(SerializableInterface<>), true)]
     public class SerializableInterfaceDrawer : PropertyDrawer
     {
-        // 🔑 Popup state – SỐNG RIÊNG
         static Dictionary<string, int> popupIndexCache = new();
 
         Type[] types;
@@ -114,7 +113,6 @@ namespace BattleTurn.Serializable.Editor
                         managed.managedReferenceValue = Activator.CreateInstance(t);
                         unityObj.objectReferenceValue = null;
                     }
-                    // ⚠️ UnityObject: KHÔNG clear gì cả
                 }
             }
 
