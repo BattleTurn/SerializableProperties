@@ -34,6 +34,12 @@ namespace BattleTurn.Serializable.Tests
     public class InterfaceAttributeTest : MonoBehaviour
     {
         public MyNestedClass myNestedClass;
+        public MyMonoBehaviour myMonoBehaviour;
         public SerializableInterface<IMyInterface> myInterfaceField;
+
+        public void Start()
+        {
+            myInterfaceField.Value = myMonoBehaviour;
+        }
     }
 }

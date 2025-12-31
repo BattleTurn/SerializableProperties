@@ -1,5 +1,8 @@
 using System;
 using UnityEngine;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 namespace BattleTurn.Serializable.Runtime
 {
@@ -10,14 +13,80 @@ namespace BattleTurn.Serializable.Runtime
 
         [SerializeReference] private T managed;
 
+        [NonSerialized] private T runtime;
+
+        [SerializeField, HideInInspector]
+        private string typeName;
+
+        public Type SelectedType =>
+            string.IsNullOrEmpty(typeName) ? null : Type.GetType(typeName);
+
         public T Value
         {
-            get
+            get => runtime ?? (unityObject as T ?? managed);
+            set => Set(value);
+        }
+
+        public SerializableInterface(T value)
+        {
+            if (value is UnityEngine.Object unityObj)
             {
-                if (unityObject is T t)
-                    return t;
-                return managed;
+                unityObject = unityObj;
+                managed = default;
+            }
+            else
+            {
+                managed = value;
+                unityObject = null;
             }
         }
+
+        public static implicit operator T(SerializableInterface<T> serializableInterface)
+        {
+            return serializableInterface.Value;
+        }
+
+        private void Set(T value)
+        {
+            runtime = value;
+
+#if UNITY_EDITOR
+            SyncSerializedType(value);
+
+            // ⭐ BẮT BUỘC: báo Editor có thay đổi
+            EditorUtility.SetDirty(EditorUtility.InstanceIDToObject(
+                UnityEditor.Selection.activeInstanceID
+            ));
+            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+#endif
+        }
+
+#if UNITY_EDITOR
+        private void SyncSerializedType(T value)
+        {
+            if (value == null)
+            {
+                unityObject = null;
+                managed = null;
+                typeName = null;
+                return;
+            }
+
+            var t = value.GetType();
+            typeName = t.AssemblyQualifiedName; // ⭐ THIẾU DÒNG NÀY
+
+            if (value is UnityEngine.Object uo)
+            {
+                unityObject = uo;
+                managed = null;
+            }
+            else
+            {
+                unityObject = null;
+                if (managed == null || managed.GetType() != t)
+                    managed = (T)Activator.CreateInstance(t);
+            }
+        }
+#endif
     }
 }

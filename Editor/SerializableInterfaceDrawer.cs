@@ -1,6 +1,5 @@
 using System;
 using System.Linq;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using BattleTurn.Serializable.Runtime;
@@ -10,8 +9,6 @@ namespace BattleTurn.Serializable.Editor
     [CustomPropertyDrawer(typeof(SerializableInterface<>), true)]
     public class SerializableInterfaceDrawer : PropertyDrawer
     {
-        static Dictionary<string, int> popupIndexCache = new();
-
         Type[] types;
         string[] names;
         bool inited;
@@ -36,110 +33,79 @@ namespace BattleTurn.Serializable.Editor
             inited = true;
         }
 
+        // ================= HEIGHT =================
+
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
+            Init(fieldInfo.FieldType.GetGenericArguments()[0]);
+
             float h = EditorGUIUtility.singleLineHeight;
-
-            // Ensure types/names are initialized – GetPropertyHeight is called before OnGUI
-            try
-            {
-                var fieldType = fieldInfo?.FieldType;
-                if (fieldType != null && fieldType.IsGenericType)
-                {
-                    var iface = fieldType.GetGenericArguments()[0];
-                    Init(iface);
-                }
-            }
-            catch { /* best-effort init; fall back to minimal height */ }
-
             int index = GetPopupIndex(property);
-            if (index <= 0) return h;
+
+            if (index <= 0)
+                return h;
 
             h += EditorGUIUtility.standardVerticalSpacing;
 
-            // Clamp index against discovered types
-            if (types == null || index - 1 < 0 || index - 1 >= types.Length)
-                return h; // fallback: header only
-
-            if (typeof(UnityEngine.Object).IsAssignableFrom(types[index - 1]))
+            Type t = types[index - 1];
+            if (typeof(UnityEngine.Object).IsAssignableFrom(t))
             {
                 h += EditorGUIUtility.singleLineHeight;
             }
             else
             {
-                var managed = property.FindPropertyRelative("managed");
-                h += GetManagedHeight(managed);
+                h += GetManagedHeight(property.FindPropertyRelative("managed"));
             }
 
             return h;
         }
 
+        // ================= GUI =================
+
         public override void OnGUI(Rect pos, SerializedProperty property, GUIContent label)
         {
-            var iface = fieldInfo.FieldType.GetGenericArguments()[0];
-            Init(iface);
+            Init(fieldInfo.FieldType.GetGenericArguments()[0]);
 
             var unityObj = property.FindPropertyRelative("unityObject");
             var managed = property.FindPropertyRelative("managed");
+            var typeNameProp = property.FindPropertyRelative("typeName");
+
+            int index = GetPopupIndex(property); // ← đọc từ typeName
 
             EditorGUI.BeginProperty(pos, label, property);
 
-            // HEADER
+            // ===== HEADER =====
             Rect header = new Rect(pos.x, pos.y, pos.width, EditorGUIUtility.singleLineHeight);
             EditorGUI.LabelField(header, label);
 
             Rect popup = header;
             popup.xMin += EditorGUIUtility.labelWidth;
 
-            string key = property.propertyPath;
-            int index = GetPopupIndex(property);
-
             EditorGUI.BeginChangeCheck();
             int newIndex = EditorGUI.Popup(popup, index, names);
             if (EditorGUI.EndChangeCheck())
             {
-                popupIndexCache[key] = newIndex;
-
-                if (newIndex == 0)
-                {
-                    unityObj.objectReferenceValue = null;
-                    managed.managedReferenceValue = null;
-                }
-                else
-                {
-                    Type t = types[newIndex - 1];
-
-                    if (typeof(UnityEngine.Object).IsAssignableFrom(t))
-                    {
-                        // 👉 CHỖ FIX: chuyển sang MonoBehaviour / ScriptableObject
-                        managed.managedReferenceValue = null;
-                    }
-                    else
-                    {
-                        // 👉 Pure C# class
-                        unityObj.objectReferenceValue = null;
-                        managed.managedReferenceValue = Activator.CreateInstance(t);
-                    }
-                }
+                ApplyTypeChange(unityObj, managed, typeNameProp, newIndex);
+                index = newIndex;
             }
 
-            // BODY
-            if (newIndex > 0)
+            // ===== BODY =====
+            if (index > 0)
             {
-                float y = pos.y + EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
-                Type t = types[newIndex - 1];
+                float y = pos.y + EditorGUIUtility.singleLineHeight
+                          + EditorGUIUtility.standardVerticalSpacing;
+
+                Type t = types[index - 1];
 
                 if (typeof(UnityEngine.Object).IsAssignableFrom(t))
                 {
-                    Rect r = new Rect(
-                        pos.x + EditorGUIUtility.labelWidth,
-                        y,
-                        pos.width - EditorGUIUtility.labelWidth,
-                        EditorGUIUtility.singleLineHeight
-                    );
-
                     unityObj.objectReferenceValue = EditorGUI.ObjectField(
-                        r,
+                        new Rect(
+                            pos.x + EditorGUIUtility.labelWidth,
+                            y,
+                            pos.width - EditorGUIUtility.labelWidth,
+                            EditorGUIUtility.singleLineHeight
+                        ),
                         unityObj.objectReferenceValue,
                         t,
                         true
@@ -154,48 +120,51 @@ namespace BattleTurn.Serializable.Editor
             EditorGUI.EndProperty();
         }
 
+        // ================= HELPERS =================
+
         int GetPopupIndex(SerializedProperty property)
         {
-            if (!inited)
-            {
-                var fieldType = fieldInfo.FieldType;
-                if (fieldType.IsGenericType)
-                {
-                    var iface = fieldType.GetGenericArguments()[0];
-                    Init(iface);
-                }
-            }
-
-            if (types == null)
+            var typeNameProp = property.FindPropertyRelative("typeName");
+            if (string.IsNullOrEmpty(typeNameProp.stringValue))
                 return 0;
 
-            string key = property.propertyPath;
+            var t = Type.GetType(typeNameProp.stringValue);
+            int idx = Array.IndexOf(types, t);
+            return idx >= 0 ? idx + 1 : 0;
+        }
 
-            if (popupIndexCache.TryGetValue(key, out int cached))
-                return cached;
-
-            var unityObj = property.FindPropertyRelative("unityObject");
-            var managed = property.FindPropertyRelative("managed");
-
-            if (managed != null && managed.managedReferenceValue != null)
+        void ApplyTypeChange(
+    SerializedProperty unityObj,
+    SerializedProperty managed,
+    SerializedProperty typeNameProp,
+    int index)
+        {
+            if (index == 0)
             {
-                int idx = Array.IndexOf(types, managed.managedReferenceValue.GetType());
-                return popupIndexCache[key] = idx >= 0 ? idx + 1 : 0;
+                unityObj.objectReferenceValue = null;
+                managed.managedReferenceValue = null;
+                typeNameProp.stringValue = null;
+                return;
             }
 
-            if (unityObj != null && unityObj.objectReferenceValue != null)
-            {
-                int idx = Array.IndexOf(types, unityObj.objectReferenceValue.GetType());
-                return popupIndexCache[key] = idx >= 0 ? idx + 1 : 0;
-            }
+            Type t = types[index - 1];
+            typeNameProp.stringValue = t.AssemblyQualifiedName;
 
-            return popupIndexCache[key] = 0;
+            if (typeof(UnityEngine.Object).IsAssignableFrom(t))
+            {
+                unityObj.objectReferenceValue = null; // chờ user chọn object
+                managed.managedReferenceValue = null;
+            }
+            else
+            {
+                unityObj.objectReferenceValue = null;
+                managed.managedReferenceValue = Activator.CreateInstance(t);
+            }
         }
 
         void DrawManaged(Rect pos, float y, SerializedProperty managed)
         {
-            if (managed == null)
-                return;
+            if (managed == null) return;
 
             SerializedProperty it = managed.Copy();
             SerializedProperty end = it.GetEndProperty();
@@ -205,7 +174,11 @@ namespace BattleTurn.Serializable.Editor
             while (!SerializedProperty.EqualContents(it, end))
             {
                 float h = EditorGUI.GetPropertyHeight(it, true);
-                EditorGUI.PropertyField(new Rect(pos.x, y, pos.width, h), it, true);
+                EditorGUI.PropertyField(
+                    new Rect(pos.x, y, pos.width, h),
+                    it,
+                    true
+                );
                 y += h + EditorGUIUtility.standardVerticalSpacing;
                 it.NextVisible(false);
             }
@@ -214,8 +187,7 @@ namespace BattleTurn.Serializable.Editor
 
         float GetManagedHeight(SerializedProperty managed)
         {
-            if (managed == null)
-                return 0f;
+            if (managed == null) return 0f;
 
             float h = 0;
             SerializedProperty it = managed.Copy();
