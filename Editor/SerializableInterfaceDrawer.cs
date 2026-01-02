@@ -1,5 +1,7 @@
 using System;
+using System.Reflection;
 using System.Linq;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using BattleTurn.Serializable.Runtime;
@@ -13,14 +15,18 @@ namespace BattleTurn.Serializable.Editor
         string[] names;
         bool inited;
 
-        void Init(Type iface)
+        void Init(Type interfaceType)
         {
             if (inited) return;
 
             types = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a => a.GetTypes())
+                .SelectMany(a =>
+                {
+                    try { return a.GetTypes(); }
+                    catch (ReflectionTypeLoadException e) { return e.Types.Where(x => x != null); }
+                })
                 .Where(t =>
-                    iface.IsAssignableFrom(t) &&
+                    interfaceType.IsAssignableFrom(t) &&
                     !t.IsAbstract &&
                     !t.IsInterface)
                 .ToArray();
@@ -37,7 +43,7 @@ namespace BattleTurn.Serializable.Editor
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
         {
-            Init(fieldInfo.FieldType.GetGenericArguments()[0]);
+            Init(GetTargetInterfaceType());
 
             float h = EditorGUIUtility.singleLineHeight;
             int index = GetPopupIndex(property);
@@ -64,7 +70,7 @@ namespace BattleTurn.Serializable.Editor
 
         public override void OnGUI(Rect pos, SerializedProperty property, GUIContent label)
         {
-            Init(fieldInfo.FieldType.GetGenericArguments()[0]);
+            Init(GetTargetInterfaceType());
 
             var unityObj = property.FindPropertyRelative("unityObject");
             var managed = property.FindPropertyRelative("managed");
@@ -120,7 +126,27 @@ namespace BattleTurn.Serializable.Editor
             EditorGUI.EndProperty();
         }
 
-        // ================= HELPERS =================
+        Type GetTargetInterfaceType()
+        {
+            // Resolve the interface T from various field declarations
+            // e.g., List<SerializableInterface<T>>, SerializableInterface<T>, or arrays
+            Type t = fieldInfo.FieldType;
+
+            // If List<...>, get element type
+            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>))
+                t = t.GetGenericArguments()[0];
+
+            // If array, get element type
+            if (t.IsArray)
+                t = t.GetElementType();
+
+            // If SerializableInterface<T>, return T
+            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(SerializableInterface<>))
+                return t.GetGenericArguments()[0];
+
+            // Fallback: return as-is
+            return t;
+        }
 
         int GetPopupIndex(SerializedProperty property)
         {
