@@ -1,6 +1,6 @@
 using System;
-using System.Reflection;
 using System.Linq;
+using System.Reflection;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -76,7 +76,10 @@ namespace BattleTurn.Serializable.Editor
             var managed = property.FindPropertyRelative("managed");
             var typeNameProp = property.FindPropertyRelative("typeName");
 
-            int index = GetPopupIndex(property); // ← đọc từ typeName
+            ArrayElementHelper.EnsureUniqueManagedInstanceInArray(property, unityObj, managed);
+
+
+            int index = GetPopupIndex(property);
 
             EditorGUI.BeginProperty(pos, label, property);
 
