@@ -53,10 +53,16 @@ namespace BattleTurn.Serializable.Runtime
 #if UNITY_EDITOR
             SyncSerializedType(value);
 
-            // ⭐ BẮT BUỘC: báo Editor có thay đổi
-            EditorUtility.SetDirty(EditorUtility.InstanceIDToObject(
-                UnityEditor.Selection.activeInstanceID
-            ));
+            // ⭐ FORCE: Send Editor have changed
+#if UNITY_6000_3_OR_NEWER
+                EditorUtility.SetDirty(EditorUtility.EntityIdToObject(
+                    Selection.activeEntityId
+                ));
+#else
+                EditorUtility.SetDirty(EditorUtility.InstanceIDToObject(
+                    UnityEditor.Selection.activeInstanceID
+                ));
+#endif
             UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
 #endif
         }
