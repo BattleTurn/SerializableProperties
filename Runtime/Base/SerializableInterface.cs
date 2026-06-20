@@ -20,8 +20,6 @@ namespace BattleTurn.Serializable.Runtime
 
         public Type Type => string.IsNullOrEmpty(typeName) ? null : Type.GetType(typeName);
 
-        public string TypeName => typeName;
-
         public T Value
         {
             get => runtime ?? (unityObject as T ?? managed);
