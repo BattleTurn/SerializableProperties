@@ -8,8 +8,8 @@ using BattleTurn.Serializable.Runtime;
 
 namespace BattleTurn.Serializable.Editor
 {
-    [CustomPropertyDrawer(typeof(SerializableInterface<>), true)]
-    public class SerializableInterfaceDrawer : PropertyDrawer
+    [CustomPropertyDrawer(typeof(SerializedGeneric<>), true)]
+    public class SerializedGenericDrawer : PropertyDrawer
     {
         Type[] types;
         string[] names;
@@ -144,7 +144,7 @@ namespace BattleTurn.Serializable.Editor
                 t = t.GetElementType();
 
             // If SerializableInterface<T>, return T
-            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(SerializableInterface<>))
+            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof(SerializedGeneric<>))
                 return t.GetGenericArguments()[0];
 
             // Fallback: return as-is
