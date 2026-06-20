@@ -1,13 +1,10 @@
 using System;
 using UnityEngine;
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
 
 namespace BattleTurn.Serializable.Runtime
 {
     [Serializable]
-    public class SerializableInterface<T> where T : class
+    public class SerializedGeneric<T> where T : class
     {
         [SerializeField] private UnityEngine.Object unityObject;
 
@@ -20,13 +17,15 @@ namespace BattleTurn.Serializable.Runtime
 
         public Type Type => string.IsNullOrEmpty(typeName) ? null : Type.GetType(typeName);
 
+        public string TypeName => typeName;
+
         public T Value
         {
             get => runtime ?? (unityObject as T ?? managed);
             set => Set(value);
         }
 
-        public SerializableInterface(T value)
+        public SerializedGeneric(T value)
         {
             if (value is UnityEngine.Object unityObj)
             {
@@ -40,7 +39,7 @@ namespace BattleTurn.Serializable.Runtime
             }
         }
 
-        public static implicit operator T(SerializableInterface<T> serializableInterface)
+        public static implicit operator T(SerializedGeneric<T> serializableInterface)
         {
             return serializableInterface.Value;
         }
@@ -50,10 +49,7 @@ namespace BattleTurn.Serializable.Runtime
             runtime = value;
 
 #if UNITY_EDITOR
-            if (!Application.isPlaying)
-            {
-                SyncSerializedType(value);
-            }
+            SyncSerializedType(value);
 #endif
         }
 
@@ -79,8 +75,7 @@ namespace BattleTurn.Serializable.Runtime
             else
             {
                 unityObject = null;
-                if (managed == null || managed.GetType() != t)
-                    managed = (T)Activator.CreateInstance(t);
+                managed = value;
             }
         }
 #endif
