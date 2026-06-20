@@ -1,0 +1,3 @@
+- battleturn.serializable_properties: SerializableInterface<T> has an editor PropertyDrawer; runtime setter should not call Selection-based EditorUtility.SetDirty.
+- For this package, edit-time serialized field syncing belongs to the editor/drawer path; play-mode Value assignments should stay runtime-only.
+- Package source is currently under Library/PackageCache, so direct edits can be overwritten by package refresh unless the package is embedded/localized.
