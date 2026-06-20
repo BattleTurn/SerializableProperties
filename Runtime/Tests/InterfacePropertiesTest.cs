@@ -51,7 +51,7 @@ namespace BattleTurn.Serializable.Tests
     [Serializable]
     public class MyNestedClass : IMyInterface
     {
-        [SerializeField] private SerializableInterface<IMyInterface> myValue;
+        [SerializeField] private SerializedGeneric<IMyInterface> myValue;
 
         public void MyMethod()
         {
@@ -59,12 +59,12 @@ namespace BattleTurn.Serializable.Tests
         }
     }
 
-    public class InterfaceAttributeTest : MonoBehaviour
+    public class InterfacePropertiesTest : MonoBehaviour
     {
         public MyNestedClass myNestedClass;
         public MyMonoBehaviour myMonoBehaviour;
-        public SerializableInterface<IMyInterface> myInterfaceField;
-        public List<SerializableInterface<IMyInterface>> myInterfaceList;
+        public SerializedGeneric<IMyInterface> myInterfaceField;
+        public List<SerializedGeneric<IMyInterface>> myInterfaceList;
 
         public void Start()
         {
