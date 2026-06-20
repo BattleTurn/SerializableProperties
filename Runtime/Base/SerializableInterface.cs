@@ -18,8 +18,9 @@ namespace BattleTurn.Serializable.Runtime
         [SerializeField, HideInInspector]
         private string typeName;
 
-        public Type SelectedType =>
-            string.IsNullOrEmpty(typeName) ? null : Type.GetType(typeName);
+        public Type Type => string.IsNullOrEmpty(typeName) ? null : Type.GetType(typeName);
+
+        public string TypeName => typeName;
 
         public T Value
         {
@@ -70,7 +71,7 @@ namespace BattleTurn.Serializable.Runtime
             }
 
             var t = value.GetType();
-            typeName = t.AssemblyQualifiedName; // ⭐ THIẾU DÒNG NÀY
+            typeName = t.AssemblyQualifiedName;
 
             if (value is UnityEngine.Object uo)
             {
