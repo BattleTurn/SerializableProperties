@@ -51,19 +51,10 @@ namespace BattleTurn.Serializable.Runtime
             runtime = value;
 
 #if UNITY_EDITOR
-            SyncSerializedType(value);
-
-            // ⭐ FORCE: Send Editor have changed
-#if UNITY_6000_3_OR_NEWER
-                EditorUtility.SetDirty(EditorUtility.EntityIdToObject(
-                    Selection.activeEntityId
-                ));
-#else
-                EditorUtility.SetDirty(EditorUtility.InstanceIDToObject(
-                    UnityEditor.Selection.activeInstanceID
-                ));
-#endif
-            UnityEditorInternal.InternalEditorUtility.RepaintAllViews();
+            if (!Application.isPlaying)
+            {
+                SyncSerializedType(value);
+            }
 #endif
         }
 
