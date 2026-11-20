@@ -1,12 +1,15 @@
 {
   "name": "battleturn.serializable_properties",
   "displayName": "Serializable Properties",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "unity": "2022.1",
-  "description": "A set of serializable properties, such as 2D array",
+  "description": "Serializable queue, stack, 2D array and interface fields that Unity can show and save in the Inspector",
   "keywords": [
     "Serializable",
-    "2D array"
+    "2D array",
+    "Queue",
+    "Stack",
+    "Inspector"
   ],
   "category": "Scripting",
   "dependencies": {

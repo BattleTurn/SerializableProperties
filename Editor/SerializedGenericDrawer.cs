@@ -13,30 +13,46 @@ namespace BattleTurn.Serializable.Editor
     {
         Type[] types;
         string[] names;
-        bool inited;
+
+        // Keyed by interface type, because Unity reuses one drawer instance across every
+        // element of a list. Caching on the instance alone showed one interface the
+        // implementations of another. Statics reset on domain reload, so no manual invalidation.
+        static readonly Dictionary<Type, (Type[] Types, string[] Names)> Cache = new();
 
         void Init(Type interfaceType)
         {
-            if (inited) return;
+            if (interfaceType == null)
+            {
+                types = Array.Empty<Type>();
+                names = new[] { "None" };
+                return;
+            }
 
-            types = AppDomain.CurrentDomain.GetAssemblies()
-                .SelectMany(a =>
-                {
-                    try { return a.GetTypes(); }
-                    catch (ReflectionTypeLoadException e) { return e.Types.Where(x => x != null); }
-                })
-                .Where(t =>
-                    interfaceType.IsAssignableFrom(t) &&
-                    !t.IsAbstract &&
-                    !t.IsInterface)
-                .ToArray();
+            if (!Cache.TryGetValue(interfaceType, out var entry))
+            {
+                // TypeCache is Unity's prebuilt index: no AppDomain sweep, no load exceptions.
+                var found = TypeCache.GetTypesDerivedFrom(interfaceType)
+                    .Where(t => !t.IsAbstract && !t.IsInterface && !t.IsGenericTypeDefinition)
+                    .ToList();
 
-            names = new string[types.Length + 1];
-            names[0] = "None";
-            for (int i = 0; i < types.Length; i++)
-                names[i + 1] = types[i].Name;
+                // GetTypesDerivedFrom excludes the type itself; the old AppDomain scan included it.
+                if (!interfaceType.IsAbstract && !interfaceType.IsInterface && !found.Contains(interfaceType))
+                    found.Insert(0, interfaceType);
 
-            inited = true;
+                // Alphabetical so the dropdown order does not shift when assemblies reorder.
+                var sorted = found.OrderBy(t => t.Name).ToArray();
+
+                var labels = new string[sorted.Length + 1];
+                labels[0] = "None";
+                for (int i = 0; i < sorted.Length; i++)
+                    labels[i + 1] = sorted[i].Name;
+
+                entry = (sorted, labels);
+                Cache[interfaceType] = entry;
+            }
+
+            types = entry.Types;
+            names = entry.Names;
         }
 
         // ================= HEIGHT =================

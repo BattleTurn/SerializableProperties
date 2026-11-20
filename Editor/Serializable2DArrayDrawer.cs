@@ -48,24 +48,7 @@ namespace BattleTurn.Serializable.Editor
             int newX = EditorGUI.IntField(xRect, "X", xProp.intValue);
             int newY = EditorGUI.IntField(yRect, "Y", yProp.intValue);
             if (EditorGUI.EndChangeCheck())
-            {
-                yProp.intValue = Mathf.Max(1, newY);
-                xProp.intValue = Mathf.Max(1, newX);
-                property.serializedObject.ApplyModifiedProperties();
-
-                object owner = property.serializedObject.targetObject;
-                if (owner != null)
-                {
-                    // fieldInfo ở đây là field chứa Serializable2DArray<>, nên GetValue trả đúng instance
-                    var arrayInstance = fieldInfo.GetValue(owner);
-                    if (arrayInstance != null)
-                    {
-                        dynamic dyn = arrayInstance;
-                        dyn.SetSize(xProp.intValue, yProp.intValue);
-                    }
-                }
-                property.serializedObject.Update();
-            }
+                Resize(property, xProp, yProp, Mathf.Max(1, newX), Mathf.Max(1, newY));
 
             cursorY += EditorGUIUtility.singleLineHeight + EditorGUIUtility.standardVerticalSpacing;
 
@@ -138,6 +121,37 @@ namespace BattleTurn.Serializable.Editor
             GUI.EndScrollView();
         }
 
+        // Resize through the instance rather than by writing x/y first. The flat index is
+        // col * rows + row, so changing Y with the list untouched moves every existing value
+        // into the wrong cell. SetSize re-maps each value to its own (x, y) instead.
+        private void Resize(SerializedProperty property, SerializedProperty xProp, SerializedProperty yProp, int newX, int newY)
+        {
+            var so = property.serializedObject;
+            var owner = so.targetObject;
+            object instance = owner != null ? fieldInfo.GetValue(owner) : null;
+
+            // shortcut: the instance path only covers a field sitting directly on the target
+            // object, edited one object at a time. Nested in a List or another [Serializable]
+            // class, fieldInfo hands back the wrong instance, so fall back to the plain resize.
+            bool canUseInstance = instance != null
+                && instance.GetType() == fieldInfo.FieldType
+                && so.targetObjects.Length == 1;
+
+            if (canUseInstance)
+            {
+                Undo.RecordObject(owner, "Resize 2D Array");
+                dynamic dyn = instance;
+                dyn.SetSize(newX, newY);
+                EditorUtility.SetDirty(owner);
+                so.Update();
+                return;
+            }
+
+            xProp.intValue = newX;
+            yProp.intValue = newY;
+            so.ApplyModifiedProperties();
+        }
+
         private static float ComputeCellSize(float totalWidth, int cols)
         {
             if (cols <= 0) cols = 1;
@@ -185,4 +199,4 @@ namespace BattleTurn.Serializable.Editor
             return col * totalRows + storageRow;
         }
     }
-}
+}

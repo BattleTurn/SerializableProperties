@@ -28,47 +28,68 @@ namespace BattleTurn.Serializable.Runtime
 
         public Serializable2DArray()
         {
-            y = 1;
             x = 1;
-            SetSize(x, y);
+            y = 1;
+            array2D = new T[x, y];
         }
 
         public Serializable2DArray(int x, int y)
         {
             this.x = Mathf.Max(1, x);
             this.y = Mathf.Max(1, y);
-            SetSize(x, y);
+            array2D = new T[this.x, this.y];
         }
 
         public void SetSize(int newX, int newY)
         {
-            if (newY == y && newX == x)
+            newX = Mathf.Max(1, newX);
+            newY = Mathf.Max(1, newY);
+
+            if (array2D != null && newX == x && newY == y)
                 return;
 
-            x = Mathf.Max(1, newX);
-            y = Mathf.Max(1, newY);
-            // Resize the 2D array
-            T[,] newArray = new T[x, y];
+            T[,] newArray = new T[newX, newY];
 
             if (array2D != null)
             {
-                int minR = Mathf.Min(x, array2D.GetLength(0));
-                int minC = Mathf.Min(y, array2D.GetLength(1));
+                int keepX = Mathf.Min(newX, array2D.GetLength(0));
+                int keepY = Mathf.Min(newY, array2D.GetLength(1));
 
-                // copy old data → new data
-                for (int x = 0; x < minR; x++)
-                    for (int y = 0; y < minC; y++)
-                        newArray[x, y] = array2D[x, y];
+                // copy old data → new data, keeping every value at its own (x, y)
+                for (int ix = 0; ix < keepX; ix++)
+                    for (int iy = 0; iy < keepY; iy++)
+                        newArray[ix, iy] = array2D[ix, iy];
             }
 
+            x = newX;
+            y = newY;
             array2D = newArray;
-            serializedValues = new List<T>(y * x);
+
+            // Rebuild the flat list now: the Inspector and a domain reload both read from it,
+            // and either can happen before the next OnBeforeSerialize.
+            OnBeforeSerialize();
+        }
+
+        // array2D is [NonSerialized], so it is null on a fresh deserialize and after
+        // a domain reload. Rebuild from the flat list instead of throwing.
+        private void EnsureArray()
+        {
+            if (array2D == null || array2D.GetLength(0) != x || array2D.GetLength(1) != y)
+                OnAfterDeserialize();
         }
 
         public T this[int x, int y]
         {
-            get => array2D[x, y];
-            set => array2D[x, y] = value;
+            get
+            {
+                EnsureArray();
+                return array2D[x, y];
+            }
+            set
+            {
+                EnsureArray();
+                array2D[x, y] = value;
+            }
         }
 
         public void OnBeforeSerialize()
@@ -84,6 +105,8 @@ namespace BattleTurn.Serializable.Runtime
 
         public void OnAfterDeserialize()
         {
+            x = Mathf.Max(1, x);
+            y = Mathf.Max(1, y);
             array2D = new T[x, y];
 
             int index = 0;
@@ -99,23 +122,27 @@ namespace BattleTurn.Serializable.Runtime
 
         public T[,] ToArray()
         {
+            EnsureArray();
             return array2D;
         }
 
         public int GetLength(int dimension)
         {
+            EnsureArray();
             return array2D.GetLength(dimension);
         }
 
         // Immediately set the slot to default(T) without destroying anything.
         public void RemoveAt(int px, int py)
         {
+            EnsureArray();
             array2D[px, py] = default;
         }
 
         // Immediately clear the slot, then schedule the Unity object for destruction at end-of-frame (safe in runtime).
         public void RemoveAndDestroyAt(int px, int py)
         {
+            EnsureArray();
             if (array2D[px, py] is UnityEngine.Object u && u != null)
             {
                 array2D[px, py] = default;
@@ -131,6 +158,7 @@ namespace BattleTurn.Serializable.Runtime
         // Editor-only or special cases: force immediate destruction (use cautiously in play mode).
         public void RemoveAndDestroyImmediateAt(int px, int py)
         {
+            EnsureArray();
             if (array2D[px, py] is UnityEngine.Object u && u != null)
             {
                 array2D[px, py] = default;
@@ -145,6 +173,7 @@ namespace BattleTurn.Serializable.Runtime
         // True if the slot holds a UnityEngine.Object that is effectively null (destroyed or not assigned)
         public bool IsUnityNullAt(int px, int py)
         {
+            EnsureArray();
             var v = array2D[px, py] as UnityEngine.Object;
             return v == null;
         }
@@ -152,6 +181,7 @@ namespace BattleTurn.Serializable.Runtime
         // Sweep grid and clear any entries that are Unity-destroyed (fake-null). Returns number of cleared cells.
         public int PruneDestroyed()
         {
+            EnsureArray();
             int removed = 0;
             for (int ix = 0; ix < x; ix++)
             {
