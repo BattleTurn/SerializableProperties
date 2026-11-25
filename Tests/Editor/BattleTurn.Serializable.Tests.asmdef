@@ -3,6 +3,7 @@
     "rootNamespace": "BattleTurn.Serializable.Tests",
     "references": [
         "BattleTurn.Serializable.Runtime",
+        "BattleTurn.Serializable.Editor",
         "UnityEngine.TestRunner",
         "UnityEditor.TestRunner"
     ],

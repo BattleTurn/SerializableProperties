@@ -9,7 +9,8 @@
     "2D array",
     "Queue",
     "Stack",
-    "Inspector"
+    "Inspector",
+    "Table view"
   ],
   "category": "Scripting",
   "dependencies": {
